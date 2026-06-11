@@ -43,36 +43,48 @@ router.post('/', (req: Request, res: Response) => {
 router.post('/test', async (req: Request, res: Response) => {
   const { apiKey, apiSecret, testnet } = req.body as ApiConfig;
 
+  if (!apiKey || !apiSecret) {
+    res.status(400).json({
+      success: false,
+      message: '请填写完整的 API Key 和 API Secret',
+    });
+    return;
+  }
+
   const config: ApiConfig = {
     apiKey: apiKey || '',
     apiSecret: apiSecret || '',
     testnet: testnet !== undefined ? testnet : true,
   };
 
+  const originalConfig = binanceService['config'];
   binanceService.setConfig(config);
+
   const result = await binanceService.testConnection();
 
-  if (result.success) {
-    store.saveApiConfig(config);
-    try {
-      const balances = await binanceService.getBalances();
-      res.json({
-        success: true,
-        message: result.message || '连接成功',
-        balances,
-      });
-    } catch (e) {
-      res.json({
-        success: true,
-        message: '连接成功，但获取余额失败',
-      });
-    }
-  } else {
+  if (!result.success) {
+    binanceService.setConfig(originalConfig);
     res.status(400).json({
       success: false,
-      message: result.message || '连接失败',
+      message: result.message || '连接失败，请检查API密钥',
     });
+    return;
   }
+
+  store.saveApiConfig(config);
+  const balances = result.balances || [];
+  store.saveBalances(balances);
+
+  res.json({
+    success: true,
+    message: '连接成功，API配置有效',
+    data: {
+      testnet: config.testnet,
+      hasApiKey: !!config.apiKey,
+      hasApiSecret: !!config.apiSecret,
+    },
+    balances,
+  });
 });
 
 export default router;

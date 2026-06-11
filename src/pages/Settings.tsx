@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
-import { Settings, Key, Shield, Check, AlertCircle, Loader2 } from 'lucide-react';
+import { Settings, Key, Shield, Check, AlertCircle, Loader2, Eye, EyeOff } from 'lucide-react';
 import { useStore } from '@/store/useStore';
 import { api } from '@/services/api';
 
 export default function SettingsPage() {
-  const { config, loadConfig } = useStore();
+  const { config, loadConfig, loadAll } = useStore();
   const [form, setForm] = useState({
     apiKey: '',
     apiSecret: '',
@@ -25,6 +25,8 @@ export default function SettingsPage() {
     const res = await api.config.test(form);
     if (res.success) {
       setMessage({ type: 'success', text: res.message || '连接成功！API配置正确' });
+      await loadConfig();
+      await loadAll();
     } else {
       setMessage({ type: 'error', text: res.message || '连接失败，请检查API密钥' });
     }
@@ -38,6 +40,7 @@ export default function SettingsPage() {
     if (res.success) {
       setMessage({ type: 'success', text: '配置已保存' });
       await loadConfig();
+      await loadAll();
     } else {
       setMessage({ type: 'error', text: '保存失败' });
     }
@@ -120,7 +123,11 @@ export default function SettingsPage() {
                 onClick={() => setShowSecret(!showSecret)}
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-text-tertiary hover:text-text-secondary"
               >
-                <Settings className="w-4 h-4" />
+                {showSecret ? (
+                  <EyeOff className="w-4 h-4" />
+                ) : (
+                  <Eye className="w-4 h-4" />
+                )}
               </button>
             </div>
           </div>

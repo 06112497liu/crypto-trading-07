@@ -76,13 +76,43 @@ export class BinanceService {
     return Promise.resolve({} as T);
   }
 
-  async testConnection(): Promise<{ success: boolean; message?: string }> {
+  async testConnection(): Promise<{ success: boolean; message?: string; balances?: Balance[] }> {
     try {
       if (this.useMock) {
         return { success: true, message: 'Mock mode - API未配置' };
       }
-      await this.request('GET', '/api/v3/ping');
-      return { success: true };
+      const accountData = await this.request<{ balances: Array<{ asset: string; free: string; locked: string }> }>(
+        'GET',
+        '/api/v3/account',
+        {},
+        true
+      );
+      const balances: Balance[] = [];
+      for (const b of accountData.balances) {
+        const free = parseFloat(b.free);
+        const locked = parseFloat(b.locked);
+        const total = free + locked;
+        if (total <= 0) continue;
+
+        let usdtValue = total;
+        if (b.asset !== 'USDT') {
+          try {
+            const price = await this.getTickerPrice(`${b.asset}USDT`);
+            usdtValue = total * price;
+          } catch {
+            usdtValue = 0;
+          }
+        }
+
+        balances.push({
+          asset: b.asset,
+          free,
+          locked,
+          total,
+          usdtValue,
+        });
+      }
+      return { success: true, balances: balances.sort((a, b) => (b.usdtValue || 0) - (a.usdtValue || 0)) };
     } catch (e) {
       return { success: false, message: (e as Error).message };
     }
@@ -103,12 +133,34 @@ export class BinanceService {
       {},
       true
     );
-    return data.balances.map((b) => ({
-      asset: b.asset,
-      free: parseFloat(b.free),
-      locked: parseFloat(b.locked),
-      total: parseFloat(b.free) + parseFloat(b.locked),
-    }));
+
+    const balances: Balance[] = [];
+    for (const b of data.balances) {
+      const free = parseFloat(b.free);
+      const locked = parseFloat(b.locked);
+      const total = free + locked;
+      if (total <= 0) continue;
+
+      let usdtValue = total;
+      if (b.asset !== 'USDT') {
+        try {
+          const price = await this.getTickerPrice(`${b.asset}USDT`);
+          usdtValue = total * price;
+        } catch {
+          usdtValue = 0;
+        }
+      }
+
+      balances.push({
+        asset: b.asset,
+        free,
+        locked,
+        total,
+        usdtValue,
+      });
+    }
+
+    return balances.sort((a, b) => (b.usdtValue || 0) - (a.usdtValue || 0));
   }
 
   async getTickerPrice(symbol: string): Promise<number> {
