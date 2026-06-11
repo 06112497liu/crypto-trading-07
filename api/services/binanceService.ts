@@ -1,14 +1,34 @@
 import crypto from 'crypto';
+import { ProxyAgent } from 'undici';
 import type { ApiConfig, Balance, Order } from '../../shared/types';
 
 const MAINNET_BASE = 'https://api.binance.com';
 const TESTNET_BASE = 'https://testnet.binance.vision';
+
+function getProxyUrl(): string | undefined {
+  return (
+    process.env.HTTPS_PROXY ||
+    process.env.https_proxy ||
+    process.env.HTTP_PROXY ||
+    process.env.http_proxy ||
+    undefined
+  );
+}
 
 export class BinanceService {
   private config: ApiConfig = { apiKey: '', apiSecret: '', testnet: true };
   private useMock = true;
   private forceMock = false;
   private connectionError: string | null = null;
+  private dispatcher: ProxyAgent | undefined;
+
+  constructor() {
+    const proxyUrl = getProxyUrl();
+    if (proxyUrl) {
+      console.log('[BinanceService] Using proxy:', proxyUrl);
+      this.dispatcher = new ProxyAgent(proxyUrl);
+    }
+  }
 
   setConfig(config: ApiConfig): void {
     this.config = config;
@@ -84,7 +104,8 @@ export class BinanceService {
           'Content-Type': 'application/json',
         },
         signal: controller.signal,
-      });
+        dispatcher: this.dispatcher,
+      } as RequestInit & { dispatcher: ProxyAgent });
 
       clearTimeout(timeoutId);
 
