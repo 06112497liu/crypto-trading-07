@@ -36,6 +36,20 @@ function roundTo(value: number, decimals: number): number {
   return Math.round(value * factor) / factor;
 }
 
+function floorToStep(value: number, stepSize: number): number {
+  if (!stepSize || stepSize <= 0) return value;
+  const decimals = Math.max(0, Math.ceil(-Math.log10(stepSize)));
+  const factor = Math.pow(10, decimals);
+  return Math.floor((value + stepSize * 1e-10) * factor) / factor;
+}
+
+function floorToTick(value: number, tickSize: number): number {
+  if (!tickSize || tickSize <= 0) return value;
+  const decimals = Math.max(0, Math.ceil(-Math.log10(tickSize)));
+  const factor = Math.pow(10, decimals);
+  return Math.floor((value + tickSize * 1e-10) * factor) / factor;
+}
+
 export async function createStrategy(params: {
   name: string;
   symbol: string;
@@ -105,8 +119,13 @@ export async function startStrategy(strategyId: string): Promise<GridStrategy> {
   const currentPrice = await binanceService.getTickerPrice(strategy.symbol);
   strategy.currentPrice = currentPrice;
 
+  const exchangeInfo = await binanceService.getExchangeInfo(strategy.symbol);
+
   for (let i = 0; i < strategy.grids.length; i++) {
     const grid = strategy.grids[i];
+    const orderPrice = floorToTick(grid.price, exchangeInfo.tickSize);
+    const orderQty = floorToStep(grid.amount, exchangeInfo.stepSize);
+    if (orderPrice <= 0 || orderQty <= 0) continue;
 
     if (grid.price < currentPrice && !grid.buyFilled) {
       try {
@@ -114,8 +133,8 @@ export async function startStrategy(strategyId: string): Promise<GridStrategy> {
           symbol: strategy.symbol,
           side: 'BUY',
           type: 'LIMIT',
-          price: grid.price,
-          quantity: grid.amount,
+          price: orderPrice,
+          quantity: orderQty,
         });
         grid.buyOrderId = result.orderId;
         const order: Order = {
@@ -123,15 +142,15 @@ export async function startStrategy(strategyId: string): Promise<GridStrategy> {
           strategyId: strategy.id,
           symbol: strategy.symbol,
           side: 'BUY',
-          price: grid.price,
-          amount: grid.amount,
+          price: orderPrice,
+          amount: orderQty,
           status: 'NEW',
           type: 'LIMIT',
           createdAt: Date.now(),
         };
         store.saveOrder(order);
       } catch (e) {
-        console.error(`Failed to place buy order at ${grid.price}:`, e);
+        console.error(`Failed to place buy order at ${orderPrice}:`, (e as Error).message);
       }
     }
 
@@ -141,8 +160,8 @@ export async function startStrategy(strategyId: string): Promise<GridStrategy> {
           symbol: strategy.symbol,
           side: 'SELL',
           type: 'LIMIT',
-          price: grid.price,
-          quantity: grid.amount,
+          price: orderPrice,
+          quantity: orderQty,
         });
         grid.sellOrderId = result.orderId;
         const order: Order = {
@@ -150,15 +169,15 @@ export async function startStrategy(strategyId: string): Promise<GridStrategy> {
           strategyId: strategy.id,
           symbol: strategy.symbol,
           side: 'SELL',
-          price: grid.price,
-          amount: grid.amount,
+          price: orderPrice,
+          amount: orderQty,
           status: 'NEW',
           type: 'LIMIT',
           createdAt: Date.now(),
         };
         store.saveOrder(order);
       } catch (e) {
-        console.error(`Failed to place sell order at ${grid.price}:`, e);
+        console.error(`Failed to place sell order at ${orderPrice}:`, (e as Error).message);
       }
     }
   }
@@ -257,6 +276,8 @@ export async function handleOrderFill(strategyId: string, orderId: string, fille
   const grid = strategy.grids.find((g) => g.price === filledPrice);
   if (!grid) return;
 
+  const exchangeInfo = await binanceService.getExchangeInfo(strategy.symbol);
+
   if (order.side === 'BUY') {
     grid.buyFilled = true;
     strategy.filledOrders++;
@@ -267,12 +288,16 @@ export async function handleOrderFill(strategyId: string, orderId: string, fille
       const nextGrid = strategy.grids[nextGridIndex];
       if (!nextGrid.sellFilled) {
         try {
+          const orderPrice = floorToTick(nextGrid.price, exchangeInfo.tickSize);
+          const orderQty = floorToStep(nextGrid.amount, exchangeInfo.stepSize);
+          if (orderPrice <= 0 || orderQty <= 0) return;
+
           const result = await binanceService.placeOrder({
             symbol: strategy.symbol,
             side: 'SELL',
             type: 'LIMIT',
-            price: nextGrid.price,
-            quantity: nextGrid.amount,
+            price: orderPrice,
+            quantity: orderQty,
           });
           nextGrid.sellOrderId = result.orderId;
           const newOrder: Order = {
@@ -280,15 +305,15 @@ export async function handleOrderFill(strategyId: string, orderId: string, fille
             strategyId: strategy.id,
             symbol: strategy.symbol,
             side: 'SELL',
-            price: nextGrid.price,
-            amount: nextGrid.amount,
+            price: orderPrice,
+            amount: orderQty,
             status: 'NEW',
             type: 'LIMIT',
             createdAt: Date.now(),
           };
           store.saveOrder(newOrder);
         } catch (e) {
-          console.error('Failed to place replacement sell order:', e);
+          console.error('Failed to place replacement sell order:', (e as Error).message);
         }
       }
     }
@@ -303,12 +328,16 @@ export async function handleOrderFill(strategyId: string, orderId: string, fille
       const prevGrid = strategy.grids[prevGridIndex];
       if (!prevGrid.buyFilled) {
         try {
+          const orderPrice = floorToTick(prevGrid.price, exchangeInfo.tickSize);
+          const orderQty = floorToStep(prevGrid.amount, exchangeInfo.stepSize);
+          if (orderPrice <= 0 || orderQty <= 0) return;
+
           const result = await binanceService.placeOrder({
             symbol: strategy.symbol,
             side: 'BUY',
             type: 'LIMIT',
-            price: prevGrid.price,
-            quantity: prevGrid.amount,
+            price: orderPrice,
+            quantity: orderQty,
           });
           prevGrid.buyOrderId = result.orderId;
           const newOrder: Order = {
@@ -316,15 +345,15 @@ export async function handleOrderFill(strategyId: string, orderId: string, fille
             strategyId: strategy.id,
             symbol: strategy.symbol,
             side: 'BUY',
-            price: prevGrid.price,
-            amount: prevGrid.amount,
+            price: orderPrice,
+            amount: orderQty,
             status: 'NEW',
             type: 'LIMIT',
             createdAt: Date.now(),
           };
           store.saveOrder(newOrder);
         } catch (e) {
-          console.error('Failed to place replacement buy order:', e);
+          console.error('Failed to place replacement buy order:', (e as Error).message);
         }
       }
     }

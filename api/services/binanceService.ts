@@ -58,6 +58,18 @@ export class BinanceService {
     return this.forceMock;
   }
 
+  hasCredentials(): boolean {
+    return !!this.config.apiKey && !!this.config.apiSecret;
+  }
+
+  private shouldMockPublicApi(): boolean {
+    return this.forceMock;
+  }
+
+  private shouldMockSignedApi(): boolean {
+    return this.useMock || this.forceMock;
+  }
+
   private getBaseUrl(): string {
     return this.config.testnet ? TESTNET_BASE : MAINNET_BASE;
   }
@@ -73,9 +85,11 @@ export class BinanceService {
     method: 'GET' | 'POST' | 'DELETE',
     path: string,
     params: Record<string, unknown> = {},
-    signed = false
+    signed = false,
+    useSignedMock = true
   ): Promise<T> {
-    if (this.isMock()) {
+    const useMock = useSignedMock ? this.shouldMockSignedApi() : this.shouldMockPublicApi();
+    if (useMock) {
       return this.mockRequest<T>(method, path, params);
     }
 
@@ -222,7 +236,7 @@ export class BinanceService {
   }
 
   async getTickerPrice(symbol: string): Promise<number> {
-    if (this.useMock) {
+    if (this.shouldMockPublicApi()) {
       const mockPrices: Record<string, number> = {
         BTCUSDT: 65000,
         ETHUSDT: 3000,
@@ -235,7 +249,7 @@ export class BinanceService {
       return mockPrices[symbol] || 100;
     }
 
-    const data = await this.request<{ price: string }>('GET', '/api/v3/ticker/price', { symbol });
+    const data = await this.request<{ price: string }>('GET', '/api/v3/ticker/price', { symbol }, false, false);
     return parseFloat(data.price);
   }
 
@@ -247,7 +261,7 @@ export class BinanceService {
     low: number;
     volume: number;
   }> {
-    if (this.useMock) {
+    if (this.shouldMockPublicApi()) {
       const base = await this.getTickerPrice(symbol);
       return {
         price: base,
@@ -266,7 +280,7 @@ export class BinanceService {
       highPrice: string;
       lowPrice: string;
       volume: string;
-    }>('GET', '/api/v3/ticker/24hr', { symbol });
+    }>('GET', '/api/v3/ticker/24hr', { symbol }, false, false);
 
     return {
       price: parseFloat(data.lastPrice),
@@ -361,7 +375,7 @@ export class BinanceService {
     maxPrice: number;
     tickSize: number;
   }> {
-    if (this.useMock) {
+    if (this.shouldMockPublicApi()) {
       return {
         minQty: 0.00001,
         maxQty: 10000,
@@ -375,7 +389,9 @@ export class BinanceService {
     const data = await this.request<{ symbols: Array<{ symbol: string; filters: Array<{ filterType: string; [key: string]: unknown }> }> }>(
       'GET',
       '/api/v3/exchangeInfo',
-      { symbol }
+      { symbol },
+      false,
+      false
     );
 
     const sym = data.symbols[0];

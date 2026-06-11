@@ -13,7 +13,11 @@ import { useStore } from '@/store/useStore';
 import type { GridStrategy, Order, Position, TickerData } from '../shared/types';
 
 function AppContent() {
-  const { updateStrategy, updateOrder, updatePosition, setTicker } = useStore();
+  const { updateStrategy, updateOrder, updatePosition, setTicker, loadAll } = useStore();
+
+  useEffect(() => {
+    loadAll();
+  }, [loadAll]);
 
   useEffect(() => {
     ws.connect();

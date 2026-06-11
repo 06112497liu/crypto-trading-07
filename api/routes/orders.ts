@@ -6,14 +6,51 @@ import { wsManager } from '../ws/wsManager';
 
 const router = express.Router();
 
-router.get('/', (req: Request, res: Response) => {
-  const orders = store.getOrders();
-  res.json({ success: true, data: orders });
+router.get('/', async (req: Request, res: Response) => {
+  try {
+    if (!binanceService.isMock()) {
+      const realOrders = await binanceService.getOpenOrders();
+      for (const order of realOrders) {
+        const existing = store.getOrder(order.orderId);
+        if (!existing) {
+          store.saveOrder(order);
+        } else {
+          store.saveOrder({ ...existing, ...order });
+        }
+      }
+    }
+    const orders = store.getOrders();
+    res.json({ success: true, data: orders });
+  } catch (e) {
+    res.status(500).json({ success: false, error: (e as Error).message });
+  }
 });
 
-router.get('/active', (req: Request, res: Response) => {
-  const orders = store.getActiveOrders();
-  res.json({ success: true, data: orders });
+router.get('/active', async (req: Request, res: Response) => {
+  try {
+    if (!binanceService.isMock()) {
+      const realOrders = await binanceService.getOpenOrders();
+      for (const order of realOrders) {
+        const existing = store.getOrder(order.orderId);
+        if (!existing) {
+          store.saveOrder(order);
+        } else {
+          store.saveOrder({ ...existing, ...order });
+        }
+      }
+      const knownIds = new Set(realOrders.map(o => o.orderId));
+      for (const o of store.getActiveOrders()) {
+        if (!knownIds.has(o.orderId)) {
+          o.status = 'CANCELED';
+          store.saveOrder(o);
+        }
+      }
+    }
+    const orders = store.getActiveOrders();
+    res.json({ success: true, data: orders });
+  } catch (e) {
+    res.status(500).json({ success: false, error: (e as Error).message });
+  }
 });
 
 router.delete('/:id', async (req: Request, res: Response) => {
