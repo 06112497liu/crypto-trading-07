@@ -18,6 +18,9 @@ interface TradingStore {
     testnet: boolean;
     hasApiKey: boolean;
     hasApiSecret: boolean;
+    isMock: boolean;
+    isForceMock: boolean;
+    connectionError: string | null;
   };
   loading: boolean;
   error: string | null;
@@ -47,6 +50,9 @@ export const useStore = create<TradingStore>((set, get) => ({
     testnet: true,
     hasApiKey: false,
     hasApiSecret: false,
+    isMock: true,
+    isForceMock: false,
+    connectionError: null,
   },
   loading: false,
   error: null,

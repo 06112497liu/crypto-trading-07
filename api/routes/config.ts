@@ -14,6 +14,9 @@ router.get('/', (req: Request, res: Response) => {
       testnet: config.testnet,
       hasApiKey: !!config.apiKey,
       hasApiSecret: !!config.apiSecret,
+      isMock: binanceService.isMock(),
+      isForceMock: binanceService.isForceMock(),
+      connectionError: binanceService.getConnectionError(),
     },
   });
 });
@@ -84,6 +87,19 @@ router.post('/test', async (req: Request, res: Response) => {
       hasApiSecret: !!config.apiSecret,
     },
     balances,
+  });
+});
+
+router.post('/force-mock', (req: Request, res: Response) => {
+  const { forceMock, reason } = req.body as { forceMock: boolean; reason?: string };
+  binanceService.setForceMock(forceMock, reason);
+  res.json({
+    success: true,
+    data: {
+      isMock: binanceService.isMock(),
+      isForceMock: binanceService.isForceMock(),
+      connectionError: binanceService.getConnectionError(),
+    },
   });
 });
 

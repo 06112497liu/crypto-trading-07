@@ -45,7 +45,22 @@ export async function createStrategy(params: {
   investment: number;
   autoStart?: boolean;
 }): Promise<GridStrategy> {
-  const currentPrice = await binanceService.getTickerPrice(params.symbol);
+  let currentPrice: number;
+  try {
+    currentPrice = await binanceService.getTickerPrice(params.symbol);
+  } catch (e) {
+    console.warn('Failed to get real price, using mock price for strategy creation');
+    const mockPrices: Record<string, number> = {
+      BTCUSDT: 65000,
+      ETHUSDT: 3000,
+      BNBUSDT: 600,
+      SOLUSDT: 150,
+      DOGEUSDT: 0.15,
+      ADAUSDT: 0.45,
+      XRPUSDT: 0.6,
+    };
+    currentPrice = mockPrices[params.symbol] || ((params.lowerPrice + params.upperPrice) / 2);
+  }
 
   if (params.lowerPrice >= params.upperPrice) {
     throw new Error('价格下限必须小于价格上限');
@@ -102,7 +117,13 @@ export async function startStrategy(strategyId: string): Promise<GridStrategy> {
     return strategy;
   }
 
-  const currentPrice = await binanceService.getTickerPrice(strategy.symbol);
+  let currentPrice: number;
+  try {
+    currentPrice = await binanceService.getTickerPrice(strategy.symbol);
+  } catch (e) {
+    console.warn('Failed to get real price, using strategy current price for start');
+    currentPrice = strategy.currentPrice || (strategy.lowerPrice + strategy.upperPrice) / 2;
+  }
   strategy.currentPrice = currentPrice;
 
   for (let i = 0; i < strategy.grids.length; i++) {

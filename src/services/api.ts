@@ -18,29 +18,72 @@ interface ApiResponse<T> {
 }
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<ApiResponse<T>> {
-  const response = await fetch(path, {
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    ...options,
-  });
+  try {
+    const response = await fetch(path, {
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      ...options,
+    });
 
-  const data = await response.json() as ApiResponse<T>;
-  return data;
+    const data = await response.json() as ApiResponse<T>;
+    return data;
+  } catch (e) {
+    if (e instanceof Error && e.message.includes('Failed to fetch')) {
+      return {
+        success: false,
+        message: '网络连接失败，请检查后端服务是否正常运行',
+      };
+    }
+    return {
+      success: false,
+      message: (e as Error).message || '请求失败',
+    };
+  }
 }
 
 export const api = {
   config: {
-    get: () => request<{ testnet: boolean; hasApiKey: boolean; hasApiSecret: boolean }>('/api/config'),
+    get: () => request<{ 
+      testnet: boolean; 
+      hasApiKey: boolean; 
+      hasApiSecret: boolean;
+      isMock: boolean;
+      isForceMock: boolean;
+      connectionError: string | null;
+    }>('/api/config'),
     save: (config: ApiConfig) =>
-      request<{ testnet: boolean; hasApiKey: boolean; hasApiSecret: boolean }>('/api/config', {
+      request<{ 
+        testnet: boolean; 
+        hasApiKey: boolean; 
+        hasApiSecret: boolean;
+        isMock: boolean;
+        isForceMock: boolean;
+        connectionError: string | null;
+      }>('/api/config', {
         method: 'POST',
         body: JSON.stringify(config),
       }),
     test: (config: ApiConfig) =>
-      request<{ testnet: boolean; hasApiKey: boolean; hasApiSecret: boolean }>('/api/config/test', {
+      request<{ 
+        testnet: boolean; 
+        hasApiKey: boolean; 
+        hasApiSecret: boolean;
+        isMock: boolean;
+        isForceMock: boolean;
+        connectionError: string | null;
+      }>('/api/config/test', {
         method: 'POST',
         body: JSON.stringify(config),
+      }),
+    forceMock: (forceMock: boolean, reason?: string) =>
+      request<{
+        isMock: boolean;
+        isForceMock: boolean;
+        connectionError: string | null;
+      }>('/api/config/force-mock', {
+        method: 'POST',
+        body: JSON.stringify({ forceMock, reason }),
       }),
   },
 

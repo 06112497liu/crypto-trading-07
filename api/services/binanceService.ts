@@ -7,14 +7,35 @@ const TESTNET_BASE = 'https://testnet.binance.vision';
 export class BinanceService {
   private config: ApiConfig = { apiKey: '', apiSecret: '', testnet: true };
   private useMock = true;
+  private forceMock = false;
+  private connectionError: string | null = null;
 
   setConfig(config: ApiConfig): void {
     this.config = config;
     this.useMock = !config.apiKey || !config.apiSecret;
+    this.forceMock = false;
+    this.connectionError = null;
+  }
+
+  setForceMock(force: boolean, reason?: string): void {
+    this.forceMock = force;
+    if (force && reason) {
+      this.connectionError = reason;
+    } else if (!force) {
+      this.connectionError = null;
+    }
+  }
+
+  getConnectionError(): string | null {
+    return this.connectionError;
   }
 
   isMock(): boolean {
-    return this.useMock;
+    return this.useMock || this.forceMock;
+  }
+
+  isForceMock(): boolean {
+    return this.forceMock;
   }
 
   private getBaseUrl(): string {
@@ -34,38 +55,54 @@ export class BinanceService {
     params: Record<string, unknown> = {},
     signed = false
   ): Promise<T> {
-    if (this.useMock) {
+    if (this.isMock()) {
       return this.mockRequest<T>(method, path, params);
     }
 
-    const url = new URL(this.getBaseUrl() + path);
-    const timestamp = Date.now();
-    const allParams = signed ? { ...params, timestamp } : params;
-    const query = new URLSearchParams(
-      Object.entries(allParams).map(([k, v]) => [k, String(v)])
-    ).toString();
+    try {
+      const url = new URL(this.getBaseUrl() + path);
+      const timestamp = Date.now();
+      const allParams = signed ? { ...params, timestamp } : params;
+      const query = new URLSearchParams(
+        Object.entries(allParams).map(([k, v]) => [k, String(v)])
+      ).toString();
 
-    if (signed) {
-      const signature = this.sign(query);
-      url.search = `${query}&signature=${signature}`;
-    } else if (query) {
-      url.search = query;
+      if (signed) {
+        const signature = this.sign(query);
+        url.search = `${query}&signature=${signature}`;
+      } else if (query) {
+        url.search = query;
+      }
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+      const response = await fetch(url.toString(), {
+        method,
+        headers: {
+          'X-MBX-APIKEY': this.config.apiKey,
+          'Content-Type': 'application/json',
+        },
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        const error = await response.text();
+        throw new Error(`Binance API error: ${response.status} ${error}`);
+      }
+
+      return (await response.json()) as T;
+    } catch (e) {
+      if (e instanceof Error && e.name === 'AbortError') {
+        throw new Error('连接 Binance API 超时，请检查网络连接或使用模拟模式');
+      }
+      if (e instanceof Error && e.message.includes('fetch failed')) {
+        throw new Error('无法连接到 Binance API，请检查网络连接、防火墙设置或使用模拟模式');
+      }
+      throw e;
     }
-
-    const response = await fetch(url.toString(), {
-      method,
-      headers: {
-        'X-MBX-APIKEY': this.config.apiKey,
-        'Content-Type': 'application/json',
-      },
-    });
-
-    if (!response.ok) {
-      const error = await response.text();
-      throw new Error(`Binance API error: ${response.status} ${error}`);
-    }
-
-    return (await response.json()) as T;
   }
 
   private mockRequest<T>(

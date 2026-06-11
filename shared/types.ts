@@ -52,6 +52,7 @@ export interface ApiConfig {
   apiKey: string;
   apiSecret: string;
   testnet: boolean;
+  forceMock?: boolean;
 }
 
 export interface Balance {

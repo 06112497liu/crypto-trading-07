@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Settings, Key, Shield, Check, AlertCircle, Loader2, Eye, EyeOff } from 'lucide-react';
+import { Key, Shield, Check, AlertCircle, Loader2, Eye, EyeOff, WifiOff, Wifi, Zap } from 'lucide-react';
 import { useStore } from '@/store/useStore';
 import { api } from '@/services/api';
 
@@ -12,6 +12,7 @@ export default function SettingsPage() {
   });
   const [testing, setTesting] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [togglingMock, setTogglingMock] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [showSecret, setShowSecret] = useState(false);
 
@@ -28,7 +29,10 @@ export default function SettingsPage() {
       await loadConfig();
       await loadAll();
     } else {
-      setMessage({ type: 'error', text: res.message || '连接失败，请检查API密钥' });
+      setMessage({ 
+        type: 'error', 
+        text: res.message || '连接失败，请检查API密钥或网络连接' 
+      });
     }
     setTesting(false);
   };
@@ -42,9 +46,24 @@ export default function SettingsPage() {
       await loadConfig();
       await loadAll();
     } else {
-      setMessage({ type: 'error', text: '保存失败' });
+      setMessage({ type: 'error', text: res.message || '保存失败' });
     }
     setSaving(false);
+  };
+
+  const handleToggleMock = async () => {
+    setTogglingMock(true);
+    const newForceMock = !config.isForceMock;
+    const res = await api.config.forceMock(newForceMock, newForceMock ? '用户手动切换到模拟模式' : undefined);
+    if (res.success) {
+      setMessage({ 
+        type: 'success', 
+        text: newForceMock ? '已切换到模拟模式' : '已切换到真实API模式' 
+      });
+      await loadConfig();
+      await loadAll();
+    }
+    setTogglingMock(false);
   };
 
   return (
@@ -57,10 +76,39 @@ export default function SettingsPage() {
       </div>
 
       <div className="card">
-        <div className="flex items-center gap-2 mb-6">
-          <Key className="w-5 h-5 text-accent-yellow" />
-          <h2 className="text-lg font-semibold text-text-primary">Binance API 密钥</h2>
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-2">
+            <Key className="w-5 h-5 text-accent-yellow" />
+            <h2 className="text-lg font-semibold text-text-primary">Binance API 密钥</h2>
+          </div>
+          <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium ${
+            config.isMock 
+              ? 'bg-accent-yellow/10 text-accent-yellow' 
+              : 'bg-accent-green/10 text-accent-green'
+          }`}>
+            {config.isMock ? (
+              <>
+                <WifiOff className="w-3.5 h-3.5" />
+                <span>模拟模式</span>
+              </>
+            ) : (
+              <>
+                <Wifi className="w-3.5 h-3.5" />
+                <span>已连接真实 API</span>
+              </>
+            )}
+          </div>
         </div>
+
+        {config.connectionError && (
+          <div className="flex items-start gap-2 text-sm text-accent-red bg-accent-red/10 rounded-lg px-4 py-3 mb-5">
+            <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="font-medium">API 连接异常</p>
+              <p className="text-xs mt-1 opacity-80">{config.connectionError}</p>
+            </div>
+          </div>
+        )}
 
         <div className="space-y-5">
           <div>
@@ -182,6 +230,28 @@ export default function SettingsPage() {
               )}
               {saving ? '保存中...' : '保存配置'}
             </button>
+          </div>
+
+          <div className="pt-4 border-t border-border">
+            <button
+              onClick={handleToggleMock}
+              disabled={togglingMock}
+              className={`w-full flex items-center justify-center gap-2 py-3 px-4 rounded-lg border transition-all ${
+                config.isForceMock
+                  ? 'bg-accent-green/10 border-accent-green/30 text-accent-green hover:bg-accent-green/20'
+                  : 'bg-bg-tertiary border-border text-text-secondary hover:text-text-primary hover:border-border-hover'
+              }`}
+            >
+              {togglingMock ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Zap className="w-4 h-4" />
+              )}
+              {config.isForceMock ? '关闭模拟模式，使用真实 API' : '强制使用模拟模式'}
+            </button>
+            <p className="text-xs text-text-tertiary mt-2 text-center">
+              当无法连接 Binance API 时，可使用模拟模式体验完整功能
+            </p>
           </div>
         </div>
       </div>
