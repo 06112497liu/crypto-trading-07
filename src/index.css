@@ -1,0 +1,117 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+  color-scheme: dark;
+  color: #EAECEF;
+  background-color: #0B0E11;
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  background-color: #0B0E11;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #181A20;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #3B4048;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #4B5563;
+}
+
+input[type='number']::-webkit-inner-spin-button,
+input[type='number']::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+input[type='number'] {
+  -moz-appearance: textfield;
+}
+
+input, select, textarea {
+  outline: none;
+}
+
+input:focus, select:focus, textarea:focus {
+  border-color: #F0B90B;
+}
+
+@layer components {
+  .btn-primary {
+    @apply bg-accent-yellow text-bg-primary font-semibold px-6 py-2.5 rounded-lg
+           hover:bg-accent-yellow-hover active:scale-[0.98] transition-all duration-150
+           disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .btn-secondary {
+    @apply bg-bg-tertiary text-text-primary font-medium px-6 py-2.5 rounded-lg
+           hover:bg-bg-card border border-border transition-all duration-150
+           disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .btn-danger {
+    @apply bg-accent-red text-white font-medium px-6 py-2.5 rounded-lg
+           hover:bg-red-500 active:scale-[0.98] transition-all duration-150
+           disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .btn-success {
+    @apply bg-accent-green text-white font-medium px-6 py-2.5 rounded-lg
+           hover:bg-green-500 active:scale-[0.98] transition-all duration-150
+           disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .card {
+    @apply bg-bg-card rounded-xl border border-border p-5;
+  }
+
+  .input-field {
+    @apply w-full bg-bg-tertiary border border-border rounded-lg px-4 py-2.5
+           text-text-primary placeholder-text-tertiary transition-colors;
+  }
+
+  .nav-item {
+    @apply flex items-center gap-3 px-4 py-3 rounded-lg text-text-secondary
+           hover:text-text-primary hover:bg-bg-tertiary transition-all duration-150
+           cursor-pointer;
+  }
+
+  .nav-item-active {
+    @apply bg-accent-yellow/10 text-accent-yellow;
+  }
+
+  .badge {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
+  }
+
+  .table-header {
+    @apply text-text-secondary text-xs font-medium uppercase tracking-wider;
+  }
+
+  .table-cell {
+    @apply px-4 py-3 text-sm text-text-primary;
+  }
+}
